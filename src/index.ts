@@ -4,6 +4,9 @@ import { z } from "zod";
 import * as dotenv from "dotenv";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
+import puppeteer from "puppeteer";
+import * as fs from "fs";
+import * as path from "path";
 
 dotenv.config();
 
@@ -52,6 +55,56 @@ POINTS OBLIGATOIRES RGPD À VÉRIFIER :
 10. Date de mise à jour de la politique
     `.trim();
     return { content: [{ type: "text", text: checklist }] };
+  }
+);
+
+// Outil 3 : générer un rapport PDF
+server.tool(
+  "generate_pdf_report",
+  "Génère un rapport PDF de conformité RGPD",
+  {
+    url: z.string(),
+    analysis: z.string(),
+    outputPath: z.string().optional()
+  },
+  async ({ url, analysis, outputPath }) => {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+        h1 { color: #1a1a2e; border-bottom: 2px solid #e63946; padding-bottom: 10px; }
+        h2 { color: #457b9d; margin-top: 30px; }
+        .url { background: #f1faee; padding: 10px; border-radius: 5px; font-size: 14px; }
+        .date { color: #888; font-size: 13px; margin-bottom: 30px; }
+        .analysis { line-height: 1.8; white-space: pre-wrap; }
+        .footer { margin-top: 50px; font-size: 12px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <h1>Rapport d'analyse RGPD</h1>
+      <div class="date">Généré le ${new Date().toLocaleDateString("fr-FR")}</div>
+      <h2>Site analysé</h2>
+      <div class="url">${url}</div>
+      <h2>Analyse de conformité</h2>
+      <div class="analysis">${analysis}</div>
+      <div class="footer">Rapport généré automatiquement — Ne constitue pas un avis juridique</div>
+    </body>
+    </html>
+    `;
+    
+    await page.setContent(html);
+    
+    const filePath = outputPath || path.join("C:\\Users\\Utilisateur\\Desktop", `rapport-rgpd-${Date.now()}.pdf`);
+    await page.pdf({ path: filePath, format: "A4", margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" } });
+    await browser.close();
+    
+    return { content: [{ type: "text", text: `PDF généré : ${filePath}` }] };
   }
 );
 
